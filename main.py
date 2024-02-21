@@ -177,22 +177,24 @@ class LastFmDashboard:
     def create_collage(self, user, period, size='3x3'):
         method = "user.gettopalbums"
         data = self.get_json_data(method, user, period)
+        albums = data['topalbums']['album']
         placeholder_img_url = "https://lastfm.freetls.fastly.net/i/u/174s/2a96cbd8b46e442fc41c2b86b821562f.png"
 
         size_dict = {'3x3': (3, 3), '4x4': (4, 4), '5x5': (5, 5), '6x6': (6, 6)}
         n_rows, n_cols = size_dict.get(size, (3, 3))
 
-        fig, axs = plt.subplots(n_rows, n_cols, figsize=(5*n_rows, 5*n_cols), facecolor='#000000')
+        fig = plt.figure(figsize=(5*n_rows, 5*n_cols), facecolor='#000000')
 
         plt.suptitle(f'Top albums from {user} ({period})', color='white', fontsize=20, fontweight='bold', 
                     path_effects=[path_effects.Stroke(linewidth=3, foreground='black'), path_effects.Normal()], y=0.87)
 
         with concurrent.futures.ThreadPoolExecutor() as executor:
-            album_images = list(executor.map(self.get_image, [album['image'][-1]['#text'] if album['image'][-1]['#text'] else placeholder_img_url for album in data['topalbums']['album']]))
+            album_images = list(executor.map(self.get_image, [album['image'][-1]['#text'] if album['image'][-1]['#text'] else placeholder_img_url for album in albums]))
 
-        for i, ax in enumerate(axs.flat):
-            if i < len(data['topalbums']['album']):
-                artist = data['topalbums']['album'][i]
+        for i in range(n_rows * n_cols):
+            ax = fig.add_subplot(n_rows, n_cols, i+1)
+            if i < len(albums):
+                artist = albums[i]
                 img = album_images[i]
                 
                 ax.imshow(img)
@@ -216,8 +218,6 @@ class LastFmDashboard:
 
         plt.subplots_adjust(wspace=0, hspace=0)
         plt.savefig('collage.png', bbox_inches='tight', pad_inches=0)
-
-
 
 if __name__ == "__main__":
     load_dotenv()
