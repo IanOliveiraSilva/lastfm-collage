@@ -162,6 +162,7 @@ class LastFmDashboard:
     def get_json_data(self, method, user, period):
         url = f"http://ws.audioscrobbler.com/2.0/?method={method}&user={user}&api_key={self.api_key}&period={period}&format=json"
         response = requests.get(url)
+        print(response.elapsed)
         return response.json()
 
     def update_output(self, n_clicks, username, period, size):
