@@ -7,6 +7,7 @@ from dash.dependencies import Input, Output
 import plotly.graph_objs as go
 import requests
 import os
+import concurrent.futures
 from dotenv import load_dotenv
 from PIL import Image
 import numpy as np
@@ -35,6 +36,7 @@ external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css',
 class LastFmDashboard:
     def __init__(self, api_key):
         self.api_key = api_key
+        self.image_cache = {}
         self.app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
         self.app.layout = html.Div([
             html.H1(
@@ -152,15 +154,6 @@ class LastFmDashboard:
             [Input('period-input', 'value')]
         )(self.update_output)
 
-    async def fetch_image(self, session, url):
-        async with session.get(url) as response:
-            return await response.read()
-
-    async def download_images(self, img_urls):
-        async with aiohttp.ClientSession() as session:
-            tasks = [self.fetch_image(session, url) for url in img_urls]
-            return await asyncio.gather(*tasks)
-        
     def get_json_data(self, method, user, period):
         url = f"http://ws.audioscrobbler.com/2.0/?method={method}&user={user}&api_key={self.api_key}&period={period}&format=json"
         response = requests.get(url)
@@ -172,7 +165,16 @@ class LastFmDashboard:
             encoded_image = base64.b64encode(open('collage.png', 'rb').read()).decode('ascii')
             return 'data:image/png;base64,{}'.format(encoded_image)
 
-    async def create_collage(self, user, period, size='3x3'):
+    def get_image(self, img_url):
+        if img_url in self.image_cache:
+            return self.image_cache[img_url]
+
+        with urllib.request.urlopen(img_url) as url:
+            img = np.array(Image.open(url))
+        self.image_cache[img_url] = img
+        return img
+
+    def create_collage(self, user, period, size='3x3'):
         method = "user.gettopalbums"
         data = self.get_json_data(method, user, period)
         placeholder_img_url = "https://lastfm.freetls.fastly.net/i/u/174s/2a96cbd8b46e442fc41c2b86b821562f.png"
@@ -185,19 +187,21 @@ class LastFmDashboard:
         plt.suptitle(f'Top albums from {user} ({period})', color='white', fontsize=20, fontweight='bold', 
                     path_effects=[path_effects.Stroke(linewidth=3, foreground='black'), path_effects.Normal()], y=0.87)
 
-        img_urls = [artist['image'][-1]['#text'] if artist['image'][-1]['#text'] else placeholder_img_url for artist in data['topalbums']['album']]
-        images = await self.download_images(img_urls)
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            album_images = list(executor.map(self.get_image, [album['image'][-1]['#text'] if album['image'][-1]['#text'] else placeholder_img_url for album in data['topalbums']['album']]))
 
         for i, ax in enumerate(axs.flat):
-            if i < len(images):
-                img = np.array(Image.open(io.BytesIO(images[i])))
+            if i < len(data['topalbums']['album']):
+                artist = data['topalbums']['album'][i]
+                img = album_images[i]
+                
                 ax.imshow(img)
                 ax.axis('off')
 
                 fancybox = patches.FancyBboxPatch((0,0),1,1, boxstyle="round,pad=0.02", linewidth=2, edgecolor="white", facecolor='none', transform=ax.transAxes)
                 ax.add_patch(fancybox)
-
-                album_name = textwrap.fill(artist['name'], width=20)  # Adjust the width as needed
+                
+                album_name = textwrap.fill(artist['name'], width=20)
 
                 ax.text(0.5, 0.05, album_name, color='white', fontsize=14, fontweight='bold', 
                         path_effects=[path_effects.withSimplePatchShadow(offset=(2, -2), shadow_rgbFace='black', alpha=0.7)],
@@ -212,7 +216,6 @@ class LastFmDashboard:
 
         plt.subplots_adjust(wspace=0, hspace=0)
         plt.savefig('collage.png', bbox_inches='tight', pad_inches=0)
-        plt.close(fig)
 
 
 
