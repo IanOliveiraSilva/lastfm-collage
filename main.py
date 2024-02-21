@@ -85,6 +85,21 @@ class LastFmDashboard:
             }
         ),
         html.Br(),
+        dcc.Dropdown(
+            id='size-input',
+            options=[
+                {'label': '3x3', 'value': '3x3'},
+                {'label': '4x4', 'value': '4x4'},
+                {'label': '5x5', 'value': '5x5'}
+            ],
+            placeholder='Size: ',
+            style={
+                'width': '50%', 
+                'fontSize': '20px',
+                'borderRadius': '15px',
+            }
+        ),
+        html.Br(),
         html.Button(
             'Generate Collage', 
             id='generate-button',
@@ -110,17 +125,6 @@ class LastFmDashboard:
                                 'Height': '874px',
                             }
                         ),
-            html.A(
-            html.Button(
-                children=[
-                    html.I(className="fas fa-download")
-                ],
-                id='download-button',
-                className="btn btn-primary mt-3"
-            ),
-            href='collage.png',
-            download="collage.png",
-        ),
     ],
     style={
         'display': 'flex',
@@ -151,7 +155,8 @@ class LastFmDashboard:
             Output('collage-image', 'src'),
             [Input('generate-button', 'n_clicks')],
             [Input('username-input', 'value')],
-            [Input('period-input', 'value')]
+            [Input('period-input', 'value')],
+            [Input('size-input', 'value')]
         )(self.update_output)
 
     def get_json_data(self, method, user, period):
@@ -159,9 +164,9 @@ class LastFmDashboard:
         response = requests.get(url)
         return response.json()
 
-    def update_output(self, n_clicks, username, period):
+    def update_output(self, n_clicks, username, period, size):
         if n_clicks > 0:
-            self.create_collage(username, period, '3x3')
+            self.create_collage(username, period, size)
             encoded_image = base64.b64encode(open('collage.png', 'rb').read()).decode('ascii')
             return 'data:image/png;base64,{}'.format(encoded_image)
 
@@ -174,7 +179,7 @@ class LastFmDashboard:
         self.image_cache[img_url] = img
         return img
 
-    def create_collage(self, user, period, size='3x3'):
+    def create_collage(self, user, period, size):
         method = "user.gettopalbums"
         data = self.get_json_data(method, user, period)
         albums = data['topalbums']['album']
