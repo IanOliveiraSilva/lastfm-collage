@@ -118,12 +118,11 @@ class LastFmDashboard:
                 'boxShadow': '0 2px #999'
             }),
             html.Br(),
+            html.A(
+                
+            ),
             html.Img(
                             id='collage-image',
-                            style={
-                                'Width': '874px',
-                                'Height': '874px',
-                            }
                         ),
     ],
     style={
@@ -159,8 +158,8 @@ class LastFmDashboard:
             [Input('size-input', 'value')]
         )(self.update_output)
 
-    def get_json_data(self, method, user, period):
-        url = f"http://ws.audioscrobbler.com/2.0/?method={method}&user={user}&api_key={self.api_key}&period={period}&format=json"
+    def get_json_data(self, method, user, period, limit):
+        url = f"http://ws.audioscrobbler.com/2.0/?method={method}&user={user}&api_key={self.api_key}&period={period}&limit={limit}&format=json"
         response = requests.get(url)
         print(response.elapsed)
         return response.json()
@@ -182,14 +181,16 @@ class LastFmDashboard:
 
     def create_collage(self, user, period, size):
         method = "user.gettopalbums"
-        data = self.get_json_data(method, user, period)
+        size_dict = {'3x3': (9, 9), '4x4': (16, 16), '5x5': (25, 25), '6x6': (36, 36)}
+        limit, _ = size_dict.get(size, (9, 9))
+        data = self.get_json_data(method, user, period, limit)
         albums = data['topalbums']['album']
         placeholder_img_url = "https://lastfm.freetls.fastly.net/i/u/174s/2a96cbd8b46e442fc41c2b86b821562f.png"
 
         size_dict = {'3x3': (3, 3), '4x4': (4, 4), '5x5': (5, 5), '6x6': (6, 6)}
         n_rows, n_cols = size_dict.get(size, (3, 3))
 
-        fig = plt.figure(figsize=(5*n_rows, 5*n_cols), facecolor='#000000')
+        fig = plt.figure(figsize=(4*n_rows, 4*n_cols), facecolor='#000000')
 
         plt.suptitle(f'Top albums from {user} ({period})', color='white', fontsize=20, fontweight='bold', 
                     path_effects=[path_effects.Stroke(linewidth=3, foreground='black'), path_effects.Normal()], y=0.87)
